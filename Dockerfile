@@ -4,7 +4,8 @@ FROM python:3.13-slim AS builder
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+# FIX: Removed --no-deps so it builds wheels for all sub-dependencies and extras
+RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 # --- Production Stage ---
 FROM python:3.13-slim
@@ -17,10 +18,12 @@ RUN groupadd -r scrapergroup && useradd -r -g scrapergroup -s /sbin/nologin scra
 
 WORKDIR /app
 
-# Install pre-built wheels from builder
+# Copy built wheels and requirements
 COPY --from=builder /app/wheels /wheels
-COPY --from=builder /app/requirements.txt .
-RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+COPY requirements.txt .
+
+# FIX: Install using requirements.txt so pip respects the [binary] extra tag
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt && rm -rf /wheels
 
 # Copy application script
 COPY scraper.py .
