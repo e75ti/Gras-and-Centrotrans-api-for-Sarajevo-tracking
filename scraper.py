@@ -79,8 +79,17 @@ def classify_vehicle(raw: RawVehicle) -> dict[str, str | float] | None:
         case 1:
             v_type = "Minibus"
         case 0 if code.isdigit():
-            # Inferred classifications based on fleet numbering
-            v_type = "Trolleybus" if len(code) == 2 else "Tram"
+            # FIX: Accurately distinguish 3-digit Trams vs Buses
+            if len(code) == 2:
+                v_type = "Trolleybus"
+            elif len(code) == 3:
+                # Trams typically start with 0, 2, 3, 5, or 7.
+                if code.startswith(('0', '2', '3', '5', '7')):
+                    v_type = "Tram"
+                else:
+                    v_type = "Bus"
+            else:
+                v_type = "Unknown"
         case _:
             v_type = "Unknown"
 
