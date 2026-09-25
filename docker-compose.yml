@@ -1,0 +1,32 @@
+name: gras-tracker
+
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: gras_postgres
+    environment:
+      POSTGRES_USER: gras
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: gras
+      PGDATA: /var/lib/postgresql/18/data
+    volumes:
+      - gras_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gras -d gras"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  scraper:
+    build: .
+    container_name: gras_scraper
+    environment:
+      # Note the '+psycopg' to explicitly use the modern psycopg v3 driver
+      DATABASE_URL: postgresql+psycopg://gras:password@db:5432/gras
+      SCRAPE_INTERVAL_SECONDS: "30"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  gras_pgdata:
