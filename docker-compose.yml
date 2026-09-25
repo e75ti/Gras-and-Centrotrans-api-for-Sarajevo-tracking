@@ -1,32 +1,51 @@
 name: gras-tracker
 
 services:
-  db:
-    image: postgres:18-alpine
-    container_name: gras_postgres
-    environment:
-      POSTGRES_USER: gras
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: gras
-      PGDATA: /var/lib/postgresql/18/data
-    volumes:
-      - gras_pgdata:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gras -d gras"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   scraper:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: gras_scraper
-    environment:
-      # Note the '+psycopg' to explicitly use the modern psycopg v3 driver
-      DATABASE_URL: postgresql+psycopg://gras:password@db:5432/gras
-      SCRAPE_INTERVAL_SECONDS: "30"
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+        required: false
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-gras}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-gras}}
+      - SCRAPE_INTERVAL_SECONDS=${SCRAPE_INTERVAL_SECONDS:-30}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    image: postgres:18-alpine
+    container_name: gras_postgres
+    restart: unless-stopped
+    profiles:
+      - local-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gras}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-gras}
+      PGDATA: /var/lib/postgresql/18/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - gras_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gras} -d ${POSTGRES_DB:-gras}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   gras_pgdata:
