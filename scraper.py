@@ -2,6 +2,7 @@ import logging
 import os
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 
 import requests
 from pydantic import BaseModel, ValidationError
@@ -12,8 +13,20 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]: %(message)s")
 logger = logging.getLogger("gras-tracker")
 
-# -- Configuration --
-DB_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://gras:password@db:5432/gras")
+# -- Configuration (Now using Docker Secrets!) --
+db_user = os.getenv("DB_USER", "gras")
+db_host = os.getenv("DB_HOST", "db")
+db_name = os.getenv("DB_NAME", "gras")
+password_file = os.getenv("DB_PASSWORD_FILE", "/run/secrets/db_password")
+
+# Safely read the password from the injected file
+try:
+    db_password = Path(password_file).read_text().strip()
+except FileNotFoundError:
+    logger.warning("Secret file not found. Falling back to default password.")
+    db_password = "password"
+
+DB_URL = f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:5432/{db_name}"
 INTERVAL = int(os.getenv("SCRAPE_INTERVAL_SECONDS", "30"))
 API_URL = "https://javniprevozks.ba/public-api/public/lines/vehicle-positions"
 HEADERS = {

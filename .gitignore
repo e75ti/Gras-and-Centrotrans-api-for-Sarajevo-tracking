@@ -1,2 +1,5 @@
 .env
 *.sql
+__pycache__/
+*.pyc
+gras_pgdata/

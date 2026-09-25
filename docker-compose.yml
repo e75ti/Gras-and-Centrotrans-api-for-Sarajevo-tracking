@@ -1,36 +1,20 @@
 name: gras-tracker
 
-services:
-  scraper:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: gras_scraper
-    restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-        required: false
-    environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-gras}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-gras}}
-      - SCRAPE_INTERVAL_SECONDS=${SCRAPE_INTERVAL_SECONDS:-30}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+secrets:
+  db_password:
+    environment: "POSTGRES_PASSWORD"
 
+services:
   db:
     image: postgres:18-alpine
     container_name: gras_postgres
     restart: unless-stopped
-    profiles:
-      - local-db
+    secrets:
+      - db_password
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-gras}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: ${POSTGRES_DB:-gras}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
       PGDATA: /var/lib/postgresql/18/data
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -41,6 +25,27 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  scraper:
+    build: .
+    container_name: gras_scraper
+    restart: unless-stopped
+    secrets:
+      - db_password
+    environment:
+      DB_USER: ${POSTGRES_USER:-gras}
+      DB_HOST: db
+      DB_NAME: ${POSTGRES_DB:-gras}
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      SCRAPE_INTERVAL_SECONDS: "30"
+    depends_on:
+      db:
+        condition: service_healthy
     logging:
       driver: "json-file"
       options:
